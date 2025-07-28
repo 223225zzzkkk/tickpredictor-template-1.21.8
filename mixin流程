@@ -1,0 +1,31 @@
+在进入游戏后运行该程序->
+
+数据包逻辑->
+onPlayerInteractBlock
+onPlayerInteractItem
+PlayerAction:
+
+public void updateSequence(int sequence) {
+		if (sequence < 0) {
+			throw new IllegalArgumentException("Expected packet sequence nr >= 0");
+		} else {
+			this.sequence = Math.max(sequence, this.sequence);
+		}
+	}
+@Override
+    	public void tick() {
+    		if (this.sequence > -1) {
+    			this.sendPacket(new PlayerActionResponseS2CPacket(this.sequence));
+    			this.sequence = -1;
+    		}...}
+序号会在每个网络tick开始时进行初始化，只要序号大于-1，
+那么客户端就会收到来自
+服务端每个网络tick开始时的序号回复包。
+Ping:
+	@Override
+	public void onQueryPing(QueryPingC2SPacket packet) {
+		this.connection.send(new PingResultS2CPacket(packet.getStartTime()));
+	}
+ping包将会被直接返回，用于准确预测延迟,抖动（太高的话就不能使用该方案）,丢包（只做提醒），这将在预测tick周期之前被执行
+
+
