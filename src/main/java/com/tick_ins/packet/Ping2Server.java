@@ -59,38 +59,42 @@ public class Ping2Server {
 
             }
         }
-        int losePing = 0;
-        long sumRtt = 0;
-        long sumAbsDiff = 0;
-        int rttTimes = 0;
-        int diffTimes=0;
-        long currentDealy=0;
+        int lostCount = 0;//丢包数
+        long sumRtt = 0;//往返延迟和
+        long sumjitter = 0;//延迟波动差的和
+        int rttCount = 0;
+        int jitterCount=0;
+        long previousRtt=0;//前一次往返延迟
+        //从ping为key,pong为value的map中取出元素
         for (Map.Entry<Long, Long> entry : mapPing.entrySet()) {
-            Long pingTime = entry.getKey();
-            Long pongTime = entry.getValue();
-            if (pongTime == 0) {
-                losePing++;//丢包数
+            Long pingTimestamp = entry.getKey();
+            Long pongTimestamp = entry.getValue();
+            if (pongTimestamp == 0) {
+                lostCount++;//丢包数
                 continue;
             }
-            long preDealy=pongTime - pingTime;//单次往返延迟
-            sumRtt += preDealy;//往返延迟的和
-            rttTimes++;//往返次数
-            if (currentDealy!=0){
-                sumAbsDiff+=Math.abs(preDealy-currentDealy);//延迟波动的和
-                diffTimes++;
+            long rtt=pongTimestamp - pingTimestamp;//单次往返延迟
+            sumRtt += rtt;//往返延迟的和
+            rttCount++;//往返次数
+            //-------------------波动延迟---------------
+            if (previousRtt!=0){
+                sumjitter+=Math.abs(rtt-previousRtt);//延迟波动的和
+                jitterCount++;
             }
-            currentDealy=preDealy;
+            //-------------------波动延迟---------------
+
+            previousRtt=rtt;
         }
-        long dealy = sumRtt/rttTimes;
-        long Diff =sumAbsDiff/diffTimes;
+        long avgRtt = sumRtt/rttCount;
+        long avgJitter =sumjitter/jitterCount;
 
 
-         if (losePing==0){
-             double result = (double)losePing/pingTimes;
+         if (lostCount==0){
+             double result = (double)lostCount/pingTimes;
              CText.onGameMessage("丢包率%.2f".formatted(result));
          }
          mapPing.clear();
-        return new Pair<Long, Long>(dealy,Diff);
+        return new Pair<Long, Long>(avgRtt,avgJitter);
     }
 
     //用于接收和处理send引起的数据包
