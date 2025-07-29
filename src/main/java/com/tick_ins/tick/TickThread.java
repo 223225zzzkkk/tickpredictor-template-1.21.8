@@ -13,11 +13,12 @@ import java.util.concurrent.ScheduledExecutorService;
 
 public  class  TickThread {
     //定义一个单线程来运行tick模拟
-    private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    private static  ScheduledExecutorService scheduler;
     private static final Queue<RunnableWithFlag> safeInputQueue = new ConcurrentLinkedQueue<>();
     private static boolean isStart=false;
     public static void start() {
         isStart=true;
+        scheduler= Executors.newScheduledThreadPool(1);
         //在开始执行tick之前应该先将延迟，延迟波动，丢包率和服务器tick都测试出来
         scheduler.execute(() -> {
             Pair<Long, Long> delayAndDiff = Ping2Server.testPing();//获取延迟和波动
@@ -66,9 +67,11 @@ public  class  TickThread {
         safeInputQueue.addAll(Arrays.asList(runnableList));
     }
     public static void shotDown() {
+        CText.onGameMessage("shotDown1");
         scheduler.shutdown();
         safeInputQueue.clear();//因为是静态变量，所以需要手动清除缓存
         isStart=false;
+        CText.onGameMessage("shotDown2");
     }
     public static boolean isStart(){
         return isStart;

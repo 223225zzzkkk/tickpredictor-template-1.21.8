@@ -34,8 +34,10 @@ public class TickPredictor implements ModInitializer {
                 register((dispatcher, registryAccess) ->
                         dispatcher.register(ClientCommandManager.literal("ping").executes(context -> {
                             if (TickThread.isStart()) {
+                                CText.onGameMessage("关闭");
                                 TickThread.shotDown();
                             } else {
+                                CText.onGameMessage("开启");
                                 TickThread.start();
                             }
 

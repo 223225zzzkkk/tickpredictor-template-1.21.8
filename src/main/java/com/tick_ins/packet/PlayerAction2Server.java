@@ -1,5 +1,6 @@
 package com.tick_ins.packet;
 
+import com.tick_ins.util.CText;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket;
 import net.minecraft.util.Pair;
@@ -56,6 +57,7 @@ public class PlayerAction2Server {
     }
         //TODO 目前mod的主要逻辑之一
     public static Pair<Long, Long> testTick(Pair<Long, Long> pair){
+        CText.onGameMessage("tick测试开始");
         PlayerAction2Server.send(997, 10, 25);
         while (lastTime !=0){
             //检测超时 1秒
@@ -96,6 +98,7 @@ public class PlayerAction2Server {
         }
         long startTick = previousEntry.getValue()-pair.getLeft();//减去往返时间
         long tickDealy =sumTick/TickTimes;//tick的间隔
+        CText.onGameMessage("tick测试结束"+tickDealy+"ms");
         return new Pair<>(startTick,tickDealy);
     }
 
