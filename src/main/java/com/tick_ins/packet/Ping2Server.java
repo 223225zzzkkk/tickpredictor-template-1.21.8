@@ -2,15 +2,19 @@ package com.tick_ins.packet;
 
 import com.tick_ins.util.CText;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.network.PlayerListEntry;
 import net.minecraft.network.packet.c2s.query.QueryPingC2SPacket;
-import net.minecraft.util.Pair;
+import net.minecraft.network.packet.s2c.play.PlayerListS2CPacket;
 import net.minecraft.util.Util;
 
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class Ping2Server {
@@ -18,23 +22,27 @@ public class Ping2Server {
     private static long lastTime;
     private static final Lock lock = new ReentrantLock();
     private static final Condition condition = lock.newCondition();
+    private static long backupRtt;     // 备用 RTT 值
+    private static volatile int rtt;
+    private static final ExecutorService rttUpdateThread = Executors.newSingleThreadExecutor();
+        private static long lastPingTimeStamp ;
 
     //ping包将被用来计算延迟
-    public static void send(long startTime) {
+    public static void send(long pingTime) {
         MinecraftClient.getInstance().getNetworkHandler().
-                sendPacket(new QueryPingC2SPacket(Util.getMeasuringTimeMs()));
+                sendPacket(new QueryPingC2SPacket(pingTime));
 
     }
 
     // 带延迟的重载方法
-    public static void send(int times, long delayMillis) {
-        for (int i = 0; i < times; i++) {
-            long startTime = Util.getMeasuringTimeMs();
-            send(startTime);
+    public static void send(int count, long delayMillis) {
+        for (int i = 0; i < count; i++) {
+            long pingTime = Util.getMeasuringTimeMs();//这里用的是客户端本身的实现，获取的是相对时间，仅用来测试ping和pong的间隔
+            send(pingTime);
             //将当前时间存入map中作为键
-            mapPing.put(startTime, 0L);
-            if (i == times - 1) {
-                lastTime = startTime;
+            mapPing.put(pingTime, 0L);
+            if (i == count - 1) {
+                lastTime = pingTime;
                 break;
             }
             if (delayMillis > 0) { // 不是最后一次且延迟>0
@@ -50,28 +58,54 @@ public class Ping2Server {
         }
     }
 
-    public static Pair<Long, Long> testPing() {
-        CText.onGameMessage("ping测试开始");
-        int pingTimes = 10;
-        CText.onGameMessage("发送");
-        Ping2Server.send(pingTimes, 50);
-        CText.onGameMessage("结束发送");
-        if (lastTime != 0) {
-            lock.lock();
-            try {
-                boolean notTimeout = condition.await(1, TimeUnit.SECONDS);
-                if (!notTimeout) {
-                    // 超时逻辑
-                    CText.onGameMessage("超时");
+    public static void updateRtt() {
+        rttUpdateThread.execute(() -> {
+            long now = System.currentTimeMillis();
+            if (now - lastPingTimeStamp > 15000) {
+                //----初始化操作 ----
+                lastTime = 0;
+                //----初始化操作 ----
+                Ping2Server.send(3, 50);
+                waitSendCallBack(300, TimeUnit.MILLISECONDS);
+                long sumRtt = 0;//往返延迟和
+                int rttCount = 0;
+                for (Map.Entry<Long, Long> entry : mapPing.entrySet()) {
+                    Long pingTimestamp = entry.getKey();
+                    Long pongTimestamp = entry.getValue();
+                    long rtt = pongTimestamp - pingTimestamp;//单次往返延迟
+                    sumRtt += rtt;//往返延迟的和
+                    rttCount++;//往返次数
                 }
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            } finally {
-                lock.unlock();
-            }
-        }
+                long avgRtt;
+                if (rttCount != 0) {
+                    avgRtt = sumRtt / rttCount;
+                } else {
+                    CText.onGameMessage("全部丢包,无法得出延迟,使用备用rtt%d".formatted(backupRtt));
+                    avgRtt = backupRtt;
+                }
+                rtt = Math.toIntExact(avgRtt);
+                mapPing.clear();
+                CText.onGameMessage("ping测试结束" + avgRtt + "ms");
+                lastPingTimeStamp=System.currentTimeMillis();
 
-        CText.onGameMessage("开始计算");
+            } else {
+                LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos( 15000-(now-lastPingTimeStamp)));
+            }
+
+
+        });
+
+
+    }
+
+    public static void testPing() {
+        //----初始化操作 ----
+        lastTime = 0;
+        //----初始化操作 ----
+
+        int pingCount = 10;
+        Ping2Server.send(pingCount, 50);
+        waitSendCallBack(1, TimeUnit.SECONDS);
         int lostCount = 0;//丢包数
         long sumRtt = 0;//往返延迟和
         long sumjitter = 0;//延迟波动差的和
@@ -96,32 +130,50 @@ public class Ping2Server {
             }
             //-------------------波动延迟---------------
 
-            previousRtt = rtt;//TODO 如果rtt始终为0(本地),会导致除0错误
+            previousRtt = rtt;// 如果rtt始终为0(本地),会导致除0错误（已经改为-1）
         }
-        CText.onGameMessage("开始除%d===%d".formatted(rttCount,jitterCount));
+        CText.onGameMessage("开始除%d===%d".formatted(rttCount, jitterCount));
+        long avgRtt;
+        if (rttCount != 0) {
+            avgRtt = sumRtt / rttCount;
+        } else {
+            CText.onGameMessage("全部丢包,无法得出延迟,使用备用rtt%d".formatted(backupRtt));
+            avgRtt = backupRtt;
+        }
 
-        long avgRtt = sumRtt / rttCount;
-        long avgJitter = sumjitter / jitterCount;
+        long avgJitter;
+        if (jitterCount != 0) {
+            avgJitter = sumjitter / jitterCount;
+            CText.onGameMessage("延迟波动目前没利用，波动为%dms".formatted(avgJitter));
+        } else {
+            CText.onGameMessage("样本为1,无法得出波动");
+        }
 
 
         if (lostCount != 0) {
-            double result = (double) lostCount / pingTimes;
+            double result = (double) lostCount / pingCount;
             CText.onGameMessage("丢包率%.2f".formatted(result));
         }
         mapPing.clear();
         CText.onGameMessage("ping测试结束" + avgRtt + "ms");
-        return new Pair<Long, Long>(avgRtt, avgJitter);
+        rtt = Math.toIntExact(avgRtt);
+        lastPingTimeStamp=System.currentTimeMillis();
     }
 
     //用于接收和处理send引起的数据包
     //Ping发送过去的startTime将会被服务器Pong返回
-    public static boolean PongTask(Long startTime) {
+    public static boolean PongTask(Long pingTime) {
         //获取当前时间戳
-        Long l2 = mapPing.get(startTime);//从map中根据startTime获取value
+        Long l2 = mapPing.get(pingTime);//从map中根据pingTime获取value
         if (l2 != null) {
+            if (lastTime == -1) {
+                lastTime = 0;
+                CText.onGameMessage("pongTask任务因滞后关闭");
+                return true;//互相之间可以关闭,防止多线程操作mapTree数组
+            }
             long currentTime = Util.getMeasuringTimeMs();
-            mapPing.put(startTime, currentTime);
-            if (startTime == lastTime) {
+            mapPing.put(pingTime, currentTime);
+            if (pingTime == lastTime) {
                 lastTime = 0L;
                 lock.lock(); // 必须先加锁
                 try {
@@ -134,5 +186,37 @@ public class Ping2Server {
         }
 
         return false;
+    }
+
+    public static void SetBackUpRtt(PlayerListS2CPacket.Entry receivedEntry, PlayerListEntry currentEntry) {
+        if (receivedEntry.profileId() == currentEntry.getProfile().getId()) {
+//            CText.onGameMessage("服务器发送的你的延迟是%d".formatted(receivedEntry.latency()));
+            backupRtt = receivedEntry.latency();
+        }
+    }
+
+    //这个方法用于控制lastTime变量的超时时间
+    public static void waitSendCallBack(int timeOut, TimeUnit unit) {
+        if (lastTime != 0) {
+            lock.lock();
+            try {
+                boolean notTimeout = condition.await(timeOut, unit);
+                if (!notTimeout) {
+                    // 超时逻辑
+                    lastTime = -1;
+                    CText.onGameMessage("ping超时");
+                }
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            } finally {
+                lock.unlock();
+            }
+
+        }
+
+    }
+
+    public static int getRtt() {
+        return rtt;
     }
 }
