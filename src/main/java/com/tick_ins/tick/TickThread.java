@@ -16,7 +16,7 @@ public class TickThread {
     //定义一个单线程来运行tick模拟
     private static ScheduledExecutorService scheduler;
     private static final Queue<RunnableWithFlag> safeInputQueue = new ConcurrentLinkedQueue<>();
-    private static boolean isStart = false;
+    private static volatile boolean isStart = false;
 
     public static void start() {
         isStart = true;

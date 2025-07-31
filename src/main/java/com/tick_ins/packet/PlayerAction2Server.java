@@ -63,7 +63,6 @@ public class PlayerAction2Server {
         }
     }
 
-    //TODO 目前mod的主要逻辑之一
     public static void testTick() {
         PlayerAction2Server.send(997, 20, 25);
         waitSendCallBack(1);
@@ -153,6 +152,9 @@ public class PlayerAction2Server {
             previousEntry = currentEntry;
             iterator.remove();
         }
+        if (previousEntry==null){
+            return;//TODO单人客户端处于暂停状态(按ESC后)，不会接收actionResponse(猜测,未验证)
+        }
         long startTickTiming = previousEntry.getValue() - rtt;//减去往返时间
         long avgTickInterval = 250;//这么高的tick真的还能玩吗(bushi
         if (TickCount == 0) {
@@ -160,7 +162,7 @@ public class PlayerAction2Server {
         } else {
             avgTickInterval = sumTickIntervals / TickCount;//tick的间隔
         }
-        CText.onGameMessage("%d".formatted(TickCount));
+        CText.onGameMessage("%d-%d".formatted(TickCount,avgTickInterval));
         while (startTickTiming < System.currentTimeMillis()) {
             startTickTiming = startTickTiming + avgTickInterval;
         }

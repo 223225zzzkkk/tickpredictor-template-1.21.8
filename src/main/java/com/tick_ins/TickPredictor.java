@@ -13,7 +13,7 @@ public class TickPredictor implements ModInitializer {
     // 使用您的 mod id 作为记录器的名称被认为是最佳实践。
     // 这样，就可以清楚地知道哪个模组编写了信息、警告和错误。
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
-    public static BufferedWriter finalWriter;
+//    public static BufferedWriter finalWriter;
     @Override
     public void onInitialize() {
         // 一旦 Minecraft 处于模组加载就绪状态，此代码就会运行。

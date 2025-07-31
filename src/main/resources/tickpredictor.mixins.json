@@ -3,7 +3,6 @@
 	"package": "com.tick_ins.mixin",
 	"compatibilityLevel": "JAVA_21",
 	"mixins": [
-
 	],
 	"injectors": {
 		"defaultRequire": 1
@@ -12,6 +11,7 @@
 		"requireAnnotations": true
 	},
 	"client": [
-		"MixinClientPlayNetworkHandler"
+		"MixinClientPlayNetworkHandler",
+		"MixinMinecraftClient"
 	]
 }

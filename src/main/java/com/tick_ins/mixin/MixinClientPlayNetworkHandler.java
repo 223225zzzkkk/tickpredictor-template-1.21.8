@@ -2,10 +2,10 @@ package com.tick_ins.mixin;
 
 import com.tick_ins.packet.Ping2Server;
 import com.tick_ins.packet.PlayerAction2Server;
-import com.tick_ins.util.CText;
+import com.tick_ins.tick.TickThread;
 import net.minecraft.client.network.ClientPlayNetworkHandler;
 import net.minecraft.client.network.PlayerListEntry;
-import net.minecraft.client.option.ServerList;
+import net.minecraft.network.packet.s2c.play.GameJoinS2CPacket;
 import net.minecraft.network.packet.s2c.play.PlayerActionResponseS2CPacket;
 import net.minecraft.network.packet.s2c.play.PlayerListS2CPacket;
 import net.minecraft.network.packet.s2c.query.PingResultS2CPacket;
@@ -27,21 +27,29 @@ public class MixinClientPlayNetworkHandler {
     }
 
     @Inject(method = "onPingResult(Lnet/minecraft/network/packet/s2c/query/PingResultS2CPacket;)V",
-    at = @At(value = "HEAD"),
-    cancellable = true)
-    private void pongTask(PingResultS2CPacket packet, CallbackInfo ci){
-        if (Ping2Server.PongTask(packet.startTime())){
+            at = @At(value = "HEAD"),
+            cancellable = true)
+    private void pongTask(PingResultS2CPacket packet, CallbackInfo ci) {
+        if (Ping2Server.PongTask(packet.startTime())) {
             ci.cancel();
         }
     }
+
     //服务器会主动发送每个玩家的延迟 但是准确度因服务器而异，将他存储为备用rtt
     @Inject(method = "handlePlayerListAction(Lnet/minecraft/network/packet/s2c/play/PlayerListS2CPacket$Action;Lnet/minecraft/network/packet/s2c/play/PlayerListS2CPacket$Entry;Lnet/minecraft/client/network/PlayerListEntry;)V",
-    at = @At(value = "HEAD"))
-    private void list(PlayerListS2CPacket.Action action, PlayerListS2CPacket.Entry receivedEntry, PlayerListEntry currentEntry, CallbackInfo ci){
-        Ping2Server.SetBackUpRtt(receivedEntry,currentEntry);
+            at = @At(value = "HEAD"))
+    private void list(PlayerListS2CPacket.Action action, PlayerListS2CPacket.Entry receivedEntry, PlayerListEntry currentEntry, CallbackInfo ci) {
+        Ping2Server.SetBackUpRtt(receivedEntry, currentEntry);
 //        CText.onGameMessage("%s-%d".formatted(receivedEntry.profile().getName(),receivedEntry.latency()));
     }
 
-
-    //TODO 不知道在什么时候启动tick
+    @Inject(method = "onGameJoin(Lnet/minecraft/network/packet/s2c/play/GameJoinS2CPacket;)V",
+    at = @At(value = "RETURN"))
+    private void GameStart(GameJoinS2CPacket packet, CallbackInfo ci){
+        if (TickThread.isStart()){
+            TickThread.shotDown();
+        }
+        TickThread.start();
+    }
+    // 不知道在什么时候启动tick ->目前定在加入游戏配置完成后
 }
