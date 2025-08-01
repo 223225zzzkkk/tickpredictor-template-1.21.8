@@ -85,7 +85,7 @@ public class Ping2Server {
                 }
                 rtt = Math.toIntExact(avgRtt);
                 mapPing.clear();
-                CText.onGameMessage("ping测试结束" + avgRtt + "ms");
+//                CText.onGameMessage("ping测试结束" + avgRtt + "ms");
                 lastPingTimeStamp=System.currentTimeMillis();
 
             } else {
@@ -132,7 +132,7 @@ public class Ping2Server {
 
             previousRtt = rtt;// 如果rtt始终为0(本地),会导致除0错误（已经改为-1）
         }
-        CText.onGameMessage("开始除%d===%d".formatted(rttCount, jitterCount));
+//        CText.onGameMessage("开始除%d===%d".formatted(rttCount, jitterCount));
         long avgRtt;
         if (rttCount != 0) {
             avgRtt = sumRtt / rttCount;

@@ -2,6 +2,7 @@ package com.tick_ins.tick;
 
 import com.tick_ins.packet.Ping2Server;
 import com.tick_ins.packet.PlayerAction2Server;
+import oshi.util.tuples.Pair;
 
 import java.util.Arrays;
 import java.util.Queue;
@@ -16,6 +17,8 @@ public class TickThread {
     private static ScheduledExecutorService scheduler;
     private static final Queue<RunnableWithFlag> safeInputQueue = new ConcurrentLinkedQueue<>();
     private static volatile boolean isStart = false;
+    public static volatile boolean notChangPlayerLook =false;
+    public static volatile float yawLock, pitchLock = 0;
 
     public static void start() {
         isStart = true;
@@ -27,26 +30,33 @@ public class TickThread {
             tick();
         });
     }
-
+//TODO 滞后感  中断标志启动禁止转向
     private static void tick() {
         long targetTimeStamp = PlayerAction2Server.getTickTiming();
         int tickInterval = PlayerAction2Server.getTickInterval();
         while (!scheduler.isShutdown()) {
             long now = System.currentTimeMillis();
             if (now < targetTimeStamp) {
-                LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(targetTimeStamp - now));
+                Ping2Server.updateRtt(); // ping和tick由各自的类维护 tick负责调用更新即可
+                PlayerAction2Server.updateTickStamp();
+                LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(  targetTimeStamp - now));
                 if (PlayerAction2Server.isTickReady()) {
                     targetTimeStamp = PlayerAction2Server.getTickTiming();
                     tickInterval = PlayerAction2Server.getTickInterval();
 //                    CText.onGameMessage("1tick时间:%d".formatted(tickInterval));
                     PlayerAction2Server.consumedTickData();//表示tick数据已被消耗
                 }
-                Ping2Server.updateRtt(); // ping和tick由各自的类维护 tick负责调用更新即可
-                PlayerAction2Server.updateTickStamp();
+                notChangPlayerLook=false;
             } else {
-                targetTimeStamp = targetTimeStamp + tickInterval;//TODO 单机状态下拒绝接收数据包问题
+               targetTimeStamp = targetTimeStamp + tickInterval;
                 RunnableWithFlag runnable;
                 while ((runnable = safeInputQueue.poll()) != null) {
+                    Pair<Float,Float> yawAndPitch = runnable.getYawAndPitch();
+                    if (yawAndPitch!=null){
+                        yawLock=yawAndPitch.getA();
+                        pitchLock=yawAndPitch.getB();
+                        notChangPlayerLook=true;
+                    }
                     runnable.getTask().run();
                     if (runnable.isFlag()) {
                         break;
@@ -74,6 +84,7 @@ public class TickThread {
         scheduler.shutdown();
         safeInputQueue.clear();//因为是静态变量，所以需要手动清除缓存
         isStart = false;
+        notChangPlayerLook=false;
         PlayerAction2Server.consumedTickData();//在初始化时不会被赋值
 //        CText.onGameMessage("shotDown2");
     }

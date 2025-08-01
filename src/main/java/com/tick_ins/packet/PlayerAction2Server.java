@@ -23,8 +23,8 @@ public class PlayerAction2Server {
     private static final Condition condition = lock.newCondition();
     public static final Map<Integer, Long> mapSeq = new TreeMap<>();
     private static final BlockPos blockPos = new BlockPos(999, 999, 999);
-    private static int tickInterval;
-    private static long tickTiming;
+    private static volatile int tickInterval;
+    private static volatile long tickTiming;
     private static volatile boolean isTickReady = false;
     private static final ExecutorService tickTimingUpdateThread = Executors.newSingleThreadExecutor();
     private static long lastUpdatedTimestamp;
@@ -102,7 +102,7 @@ public class PlayerAction2Server {
             try {
                 long now = System.currentTimeMillis();
                 if (now - lastUpdatedTimestamp > 60000) {
-                    PlayerAction2Server.send(1000, 10, 25);
+                    PlayerAction2Server.send(1000, 6, 35);
                     if (waitSendCallBack(1)) {
                         return;
                     }
@@ -185,7 +185,7 @@ public class PlayerAction2Server {
         } else {
             avgTickInterval = sumTickIntervals / TickCount;//tick的间隔
         }
-        CText.onGameMessage("%d-%d".formatted(TickCount, avgTickInterval));
+//        CText.onGameMessage("%d-%d".formatted(TickCount, avgTickInterval));
         while (startTickTiming < System.currentTimeMillis()) {
             startTickTiming = startTickTiming + avgTickInterval;
         }

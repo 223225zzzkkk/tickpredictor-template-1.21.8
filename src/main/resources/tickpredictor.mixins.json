@@ -1,17 +1,20 @@
 {
-	"required": true,
-	"package": "com.tick_ins.mixin",
-	"compatibilityLevel": "JAVA_21",
-	"mixins": [
-	],
-	"injectors": {
-		"defaultRequire": 1
-	},
-	"overwrites": {
-		"requireAnnotations": true
-	},
-	"client": [
-		"MixinClientPlayNetworkHandler",
-		"MixinMinecraftClient"
+  "required": true,
+  "package": "com.tick_ins.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "MixinPlayerMoveC2SPacket",
+    "MixinPlayerMoveC2SPacket$full",
+    "MixinPlayerMoveC2SPacket$LookAndOnGround"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "overwrites": {
+    "requireAnnotations": true
+  },
+  "client": [
+    "MixinClientPlayNetworkHandler",
+    "MixinMinecraftClient"
 	]
 }
