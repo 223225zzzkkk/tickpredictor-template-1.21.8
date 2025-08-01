@@ -28,6 +28,7 @@ public class PlayerAction2Server {
     private static volatile boolean isTickReady = false;
     private static final ExecutorService tickTimingUpdateThread = Executors.newSingleThreadExecutor();
     private static long lastUpdatedTimestamp;
+    private static volatile boolean isTaskRunning = false;
 
     //blockPos创建一个较大值，让服务器抛出该操作
     public static void send(int sequence) {
@@ -65,7 +66,9 @@ public class PlayerAction2Server {
 
     public static void testTick() {
         PlayerAction2Server.send(997, 20, 25);
-        waitSendCallBack(1);
+        if (waitSendCallBack(1)) {
+            return;
+        }
         TickTiming(Ping2Server.getRtt());
     }
 
@@ -91,23 +94,34 @@ public class PlayerAction2Server {
     }
 
     public static void updateTickStamp() {
+        if (isTaskRunning || MinecraftClient.getInstance().isPaused()) {
+            return;
+        }
+        isTaskRunning = true;
         tickTimingUpdateThread.execute(() -> {
-            long now = System.currentTimeMillis();
-            if (now - lastUpdatedTimestamp > 60000) {
-                PlayerAction2Server.send(1000, 10, 25);
-                waitSendCallBack(1);
-                TickTiming(Ping2Server.getRtt());
-                isTickReady = true;//仅在更新方法内需要,保证数据线程安全
-            } else {
-                LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos( 60000-(now-lastUpdatedTimestamp)));
+            try {
+                long now = System.currentTimeMillis();
+                if (now - lastUpdatedTimestamp > 60000) {
+                    PlayerAction2Server.send(1000, 10, 25);
+                    if (waitSendCallBack(1)) {
+                        return;
+                    }
+                    isTickReady = TickTiming(Ping2Server.getRtt());
+                    //仅在更新方法内需要,保证数据线程安全
+                } else {
+                    LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(60000 - (now - lastUpdatedTimestamp)));
+                }
+            } finally {
+                isTaskRunning = false;
             }
+
 
         });
 
     }
 
     //这个方法用于控制lastTime变量的超时时间
-    public static void waitSendCallBack(int seconds) {
+    public static boolean waitSendCallBack(int seconds) {
         if (lastSeq != 0) {
             lock.lock();
             try {
@@ -115,6 +129,13 @@ public class PlayerAction2Server {
                 if (!notTimeout) {
                     // 超时逻辑
                     lastSeq = 0;
+
+                    if (MinecraftClient.getInstance().isPaused()) {
+                        mapSeq.clear();
+                        tickTiming = System.currentTimeMillis();
+                        tickInterval = 50;
+                        return true;
+                    }
                     CText.onGameMessage("tick超时");
                 }
             } catch (InterruptedException e) {
@@ -124,10 +145,11 @@ public class PlayerAction2Server {
             }
 
         }
+        return false;
     }
 
     //这个方法用于根据mapTree和rtt求出目标tick以及tick速率
-    public static void TickTiming(long rtt) {
+    public static boolean TickTiming(long rtt) {
         long sumTickIntervals = 0;
         int TickCount = 0;
         Iterator<Map.Entry<Integer, Long>> iterator = mapSeq.entrySet().iterator();
@@ -152,23 +174,25 @@ public class PlayerAction2Server {
             previousEntry = currentEntry;
             iterator.remove();
         }
-        if (previousEntry==null){
-            return;//TODO单人客户端处于暂停状态(按ESC后)，不会接收actionResponse(猜测,未验证)
-        }
+        if (previousEntry == null) {
+            return false;//单人客户端处于暂停状态(按ESC后)，不会接收actionResponse(猜测,未验证)
+        }//  public boolean isPaused() {return this.paused;}
         long startTickTiming = previousEntry.getValue() - rtt;//减去往返时间
         long avgTickInterval = 250;//这么高的tick真的还能玩吗(bushi
         if (TickCount == 0) {
+            CText.onGameMessage("%s".formatted(previousEntry));
             CText.onGameMessage("Fail:tick too slow");
         } else {
             avgTickInterval = sumTickIntervals / TickCount;//tick的间隔
         }
-        CText.onGameMessage("%d-%d".formatted(TickCount,avgTickInterval));
+        CText.onGameMessage("%d-%d".formatted(TickCount, avgTickInterval));
         while (startTickTiming < System.currentTimeMillis()) {
             startTickTiming = startTickTiming + avgTickInterval;
         }
         tickTiming = startTickTiming;
         tickInterval = Math.toIntExact(avgTickInterval);
         lastUpdatedTimestamp = System.currentTimeMillis();
+        return true;
     }
 
     public static long getTickTiming() {
@@ -182,7 +206,8 @@ public class PlayerAction2Server {
     public static boolean isTickReady() {
         return isTickReady;
     }
+
     public static void consumedTickData() {
-         isTickReady=false;
+        isTickReady = false;
     }
 }

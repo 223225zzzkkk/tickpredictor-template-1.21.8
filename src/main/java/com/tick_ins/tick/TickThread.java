@@ -2,7 +2,6 @@ package com.tick_ins.tick;
 
 import com.tick_ins.packet.Ping2Server;
 import com.tick_ins.packet.PlayerAction2Server;
-import com.tick_ins.util.CText;
 
 import java.util.Arrays;
 import java.util.Queue;
