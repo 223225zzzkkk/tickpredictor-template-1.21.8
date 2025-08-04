@@ -15,6 +15,7 @@
   },
   "client": [
     "MixinClientPlayNetworkHandler",
+    "MixinDebugHud",
     "MixinMinecraftClient"
-	]
+  ]
 }
