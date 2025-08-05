@@ -35,4 +35,26 @@ public class RunnableWithFlag {
         return Flag;
     }
     public Pair<Float, Float> getYawAndPitch(){return YawAndPitch;}
+
+
+
+    public static class Builder {
+        private boolean flag;
+        //Flag作为tick中断标志位，当为true时当前tick不再执行后续task
+        private Runnable task;
+        private  Pair<Float, Float> yawAndPitch;
+
+        public void setFlag(boolean flag){
+            this.flag =flag;
+        }
+        public void setTask(Runnable runnable){
+            this.task =runnable;
+        }
+        public void setYawAndPitch(Pair<Float, Float> yawAndPitch){
+            this.yawAndPitch =yawAndPitch;
+        }
+        public RunnableWithFlag build(){
+            return new RunnableWithFlag(this.task,this.flag,this.yawAndPitch);
+        }
+    }
 }

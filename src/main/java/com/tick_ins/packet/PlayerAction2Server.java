@@ -25,7 +25,7 @@ public class PlayerAction2Server {
     private static final BlockPos blockPos = new BlockPos(999, 999, 999);
     private static volatile int tickInterval;
     private static volatile long tickTiming;
-    private static volatile boolean isTickReady = false;
+    private static volatile boolean isTickDateReady = false;
     private static final ExecutorService tickTimingUpdateThread = Executors.newSingleThreadExecutor();
     private static long lastUpdatedTimestamp;
     private static volatile boolean isTaskRunning = false;
@@ -106,7 +106,7 @@ public class PlayerAction2Server {
                     if (waitSendCallBack(1)) {
                         return;
                     }
-                    isTickReady = TickTiming(Ping2Server.getRtt());
+                    isTickDateReady = TickTiming(Ping2Server.getRtt());
                     //仅在更新方法内需要,保证数据线程安全
                 } else {
                     LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(60000 - (now - lastUpdatedTimestamp)));
@@ -203,11 +203,11 @@ public class PlayerAction2Server {
         return tickInterval;
     }
 
-    public static boolean isTickReady() {
-        return isTickReady;
+    public static boolean isTickDateReady() {
+        return isTickDateReady;
     }
 
     public static void consumedTickData() {
-        isTickReady = false;
+        isTickDateReady = false;
     }
 }

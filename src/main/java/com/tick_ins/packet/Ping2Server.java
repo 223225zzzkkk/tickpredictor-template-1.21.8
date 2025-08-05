@@ -141,21 +141,21 @@ public class Ping2Server {
             avgRtt = backupRtt;
         }
 
-        long avgJitter;
-        if (jitterCount != 0) {
-            avgJitter = sumjitter / jitterCount;
-            CText.onGameMessage("延迟波动目前没利用，波动为%dms".formatted(avgJitter));
-        } else {
-            CText.onGameMessage("样本为1,无法得出波动");
-        }
+//        long avgJitter;
+//        if (jitterCount != 0) {
+//            avgJitter = sumjitter / jitterCount;
+//            CText.onGameMessage("avgJitter=>%dms".formatted(avgJitter));
+//        } else {
+//            CText.onGameMessage("样本为1,无法得出波动");
+//        }
 
 
         if (lostCount != 0) {
             double result = (double) lostCount / pingCount;
-            CText.onGameMessage("丢包率%.2f".formatted(result));
+            CText.onGameMessage("packetLossRate:%.2f".formatted(result));
         }
         mapPing.clear();
-        CText.onGameMessage("ping测试结束" + avgRtt + "ms");
+//        CText.onGameMessage("avgRtt=>" + avgRtt + "ms");
         rtt = Math.toIntExact(avgRtt);
         lastPingTimeStamp=System.currentTimeMillis();
     }
@@ -189,8 +189,8 @@ public class Ping2Server {
     }
 
     public static void SetBackUpRtt(PlayerListS2CPacket.Entry receivedEntry, PlayerListEntry currentEntry) {
-        if (receivedEntry.profileId() == currentEntry.getProfile().getId()) {
-//            CText.onGameMessage("服务器发送的你的延迟是%d".formatted(receivedEntry.latency()));
+        if (receivedEntry.profileId().equals(currentEntry.getProfile().getId()) ) {
+            CText.onGameMessage("服务器发送的你的延迟是%d".formatted(receivedEntry.latency()));
             backupRtt = receivedEntry.latency();
         }
     }
