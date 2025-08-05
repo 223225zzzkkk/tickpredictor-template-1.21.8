@@ -190,7 +190,7 @@ public class Ping2Server {
 
     public static void SetBackUpRtt(PlayerListS2CPacket.Entry receivedEntry, PlayerListEntry currentEntry) {
         if (receivedEntry.profileId().equals(currentEntry.getProfile().getId()) ) {
-            CText.onGameMessage("服务器发送的你的延迟是%d".formatted(receivedEntry.latency()));
+//            CText.onGameMessage("服务器发送的你的延迟是%d".formatted(receivedEntry.latency()));
             backupRtt = receivedEntry.latency();
         }
     }

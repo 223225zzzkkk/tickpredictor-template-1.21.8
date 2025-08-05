@@ -11,9 +11,10 @@ import java.util.concurrent.locks.LockSupport;
 public class TickThread {
     //定义一个单线程来运行tick模拟
     private static ScheduledExecutorService scheduler;
-    private static final Queue<RunnableWithFlag> tasks = new ConcurrentLinkedQueue<>();
+    private static final Queue<Runnable> cacheTasks = new ConcurrentLinkedQueue<>();
+    private static final Queue<RunnableWithLast> tasks = new ConcurrentLinkedQueue<>();
     private static final Queue<RunnableWithCountDown> countDownCacheQueue = new ConcurrentLinkedQueue<>();
-    private static final Queue<RunnableWithFlag> safeInputQueue = new ConcurrentLinkedQueue<>();
+    private static final Queue<RunnableWithLast> safeInputQueue = new ConcurrentLinkedQueue<>();
     private static volatile boolean isStart = false;
     public static volatile boolean notChangPlayerLook = false;
     public static volatile float yawLock, pitchLock = 0;
@@ -48,34 +49,39 @@ public class TickThread {
                     PlayerAction2Server.consumedTickData();//表示tick数据已被消耗
                 }
             } else {
-                FlagTaskManager();
+                RunnableManger();
                 CountdownTaskManager();
                 TasksManager();
                 FlagTaskManager();
+                targetTimeStamp = targetTimeStamp + tickInterval;
             }
-            targetTimeStamp = targetTimeStamp + tickInterval;
+
 
         }
     }
-    
+
     //添加task缓存
-    public static void addFlagTask(RunnableWithFlag runnable) {
+    public static void addLastTask(RunnableWithLast runnable) {
         safeInputQueue.add(runnable);
     }
 
     //重载
-    public static void addFlagTask(RunnableWithFlag... runnableList) {
+    public static void addLastTask(RunnableWithLast... runnableList) {
         safeInputQueue.addAll(Arrays.asList(runnableList));
     }
-    public static void addCountDownTask(RunnableWithCountDown runnable){
+
+    public static void addCountDownTask(RunnableWithCountDown runnable) {
         countDownCacheQueue.add(runnable);
     }
-    public static void addTask(RunnableWithFlag... runnableList){
+
+    public static void addTask(RunnableWithLast... runnableList) {
         tasks.addAll(Arrays.asList(runnableList));
     }
-    public static void addTask(RunnableWithFlag runnable) {
+
+    public static void addTask(RunnableWithLast runnable) {
         tasks.add(runnable);
     }
+
     public static void shotDown() {
 //        CText.onGameMessage("shotDown1");
         scheduler.shutdown();
@@ -90,7 +96,7 @@ public class TickThread {
         return isStart;
     }
 
-    public static void CountdownTaskManager(){
+    public static void CountdownTaskManager() {
         RunnableWithCountDown runnableWithCountDown;
         List<RunnableWithCountDown> toRetry = new ArrayList<>();
         while ((runnableWithCountDown = countDownCacheQueue.poll()) != null) {
@@ -102,28 +108,25 @@ public class TickThread {
         }
         countDownCacheQueue.addAll(toRetry);
     }
-    public static void FlagTaskManager(){
-        RunnableWithFlag runnable;
-        while ((runnable = safeInputQueue.poll()) != null) {
-            if (runnable.isFlag()){
-                Pair<Float, Float> yawAndPitch = runnable.getYawAndPitch();
-                if (yawAndPitch != null) {
-                    yawLock = yawAndPitch.getA();
-                    pitchLock = yawAndPitch.getB();
-                    notChangPlayerLook = true;
-                }
-                runnable.getTask().run();
-            }else {
-                runnable.getTask().run();
-                notChangPlayerLook = false;
-                break;
-            }
 
+    public static void FlagTaskManager() {
+        RunnableWithLast runnable;
+        while ((runnable = safeInputQueue.poll()) != null) {
+
+            Pair<Float, Float> yawAndPitch = runnable.getYawAndPitch();
+            if (yawAndPitch != null) {
+                yawLock = yawAndPitch.getA();
+                pitchLock = yawAndPitch.getB();
+                notChangPlayerLook = true;
+            }
+            runnable.getTask().run();
+            cacheTasks.addAll(runnable.getCacheTask());
 
         }
     }
-    public static void TasksManager(){
-        RunnableWithFlag runnable;
+
+    public static void TasksManager() {
+        RunnableWithLast runnable;
         while ((runnable = tasks.poll()) != null) {
             Pair<Float, Float> yawAndPitch = runnable.getYawAndPitch();
             if (yawAndPitch != null) {
@@ -134,5 +137,13 @@ public class TickThread {
             runnable.getTask().run();
             notChangPlayerLook = false;
         }
+    }
+
+    public static void RunnableManger() {
+        Runnable runnable;
+        while ((runnable = cacheTasks.poll()) != null) {
+            runnable.run();
+        }
+        notChangPlayerLook = false;
     }
 }
